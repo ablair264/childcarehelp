@@ -110,8 +110,8 @@ function CookieConsent() {
                     disabled={forced}
                     onClick={() => !forced && setPrefs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))}
                     className={`mt-0.5 w-10 h-6 rounded-full transition-colors flex-shrink-0 relative ${forced || prefs[key as keyof typeof prefs]
-                        ? 'bg-purple'
-                        : 'bg-gray-300'
+                      ? 'bg-purple'
+                      : 'bg-gray-300'
                       } ${forced ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${forced || prefs[key as keyof typeof prefs] ? 'translate-x-5' : 'translate-x-1'
@@ -191,7 +191,7 @@ function Navigation({ page, onNavigate }: { page: Page; onNavigate: (p: Page) =>
               <Baby className="w-6 h-6 text-white" />
             </div>
             <span className="font-heading font-bold text-xl text-dark">
-              UK Childcare<span className="text-purple">Help</span>
+              UK Childcare Help
             </span>
           </button>
 
@@ -243,7 +243,7 @@ function Navigation({ page, onNavigate }: { page: Page; onNavigate: (p: Page) =>
           </div>
         )}
       </div>
-    </nav>
+    </nav >
   );
 }
 
@@ -278,7 +278,7 @@ function HeroSection() {
           <div className="space-y-8 z-10">
             <Badge className="bg-purple-light text-purple border-0 px-4 py-2 text-sm font-medium animate-fade-in">
               <Sparkles className="w-4 h-4 mr-2" />
-              UK Childcare Funding Guide 2025
+              UK Childcare Funding Guide 2026
             </Badge>
             <h1 className="font-heading font-extrabold text-5xl lg:text-6xl xl:text-7xl text-dark leading-tight animate-slide-up">
               Childcare Funding{' '}
@@ -700,7 +700,7 @@ function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <div className="w-10 h-10 rounded-xl bg-purple flex items-center justify-center">
                 <Baby className="w-6 h-6 text-white" />
               </div>
-              <span className="font-heading font-bold text-xl">UK Childcare<span className="text-purple">Help</span></span>
+              <span className="font-heading font-bold text-xl">UK Childcare Help</span>
             </div>
             <p className="text-white/60 max-w-md mb-6">Making UK childcare funding simple and accessible for every family. Calculate your savings, check your eligibility, and start your application today.</p>
             <div className="flex gap-4">

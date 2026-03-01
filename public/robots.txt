@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ukchildcarehelp.co.uk/sitemap.xml
