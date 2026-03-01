@@ -29,6 +29,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
+// Extend window for gtag
+declare global {
+  interface Window {
+    gtag: (...args: unknown[]) => void;
+    dataLayer: unknown[];
+  }
+}
+
 // ─── Cookie Consent ──────────────────────────────────────────────────────────
 function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -48,6 +56,27 @@ function CookieConsent() {
       ? { analytics: true, marketing: true, essential: true, timestamp: Date.now() }
       : { ...prefs, essential: true, timestamp: Date.now() };
     localStorage.setItem('cookie_consent', JSON.stringify(consent));
+
+    // Update GA consent in real time
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', {
+        analytics_storage: consent.analytics ? 'granted' : 'denied',
+        ad_storage: consent.marketing ? 'granted' : 'denied',
+      });
+      if (consent.analytics) {
+        window.gtag('event', 'page_view');
+      }
+
+      // Dynamically inject AdSense if marketing just got accepted
+      if (consent.marketing && !document.querySelector('script[src*="adsbygoogle"]')) {
+        const s = document.createElement('script');
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1986133345420332';
+        document.head.appendChild(s);
+      }
+    }
+
     setVisible(false);
     toast.success('Cookie preferences saved!');
   };
@@ -88,15 +117,13 @@ function CookieConsent() {
                   <button
                     disabled={forced}
                     onClick={() => !forced && setPrefs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))}
-                    className={`mt-0.5 w-10 h-6 rounded-full transition-colors flex-shrink-0 relative ${
-                      forced || prefs[key as keyof typeof prefs]
+                    className={`mt-0.5 w-10 h-6 rounded-full transition-colors flex-shrink-0 relative ${forced || prefs[key as keyof typeof prefs]
                         ? 'bg-purple'
                         : 'bg-gray-300'
-                    } ${forced ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                      } ${forced ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      forced || prefs[key as keyof typeof prefs] ? 'translate-x-5' : 'translate-x-1'
-                    }`} />
+                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${forced || prefs[key as keyof typeof prefs] ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
                   </button>
                   <div>
                     <p className="font-medium text-dark text-sm">{label} {forced && <span className="text-light text-xs">(Always on)</span>}</p>
@@ -136,7 +163,7 @@ function CookieConsent() {
 
 // ─── Simple page router ───────────────────────────────────────────────────────
 type Page = 'home' | 'privacy' | 'terms' | 'cookies';
-let _navigate: (p: Page) => void = () => {};
+let _navigate: (p: Page) => void = () => { };
 function navigate(p: Page) { _navigate(p); }
 
 // ─── Navigation Component ─────────────────────────────────────────────────────
@@ -172,7 +199,7 @@ function Navigation({ page, onNavigate }: { page: Page; onNavigate: (p: Page) =>
               <Baby className="w-6 h-6 text-white" />
             </div>
             <span className="font-heading font-bold text-xl text-dark">
-              Childcare<span className="text-purple">Hub</span>
+              UK Childcare<span className="text-purple">Help</span>
             </span>
           </button>
 
@@ -681,7 +708,7 @@ function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <div className="w-10 h-10 rounded-xl bg-purple flex items-center justify-center">
                 <Baby className="w-6 h-6 text-white" />
               </div>
-              <span className="font-heading font-bold text-xl">Childcare<span className="text-purple">Hub</span></span>
+              <span className="font-heading font-bold text-xl">UK Childcare<span className="text-purple">Help</span></span>
             </div>
             <p className="text-white/60 max-w-md mb-6">Making UK childcare funding simple and accessible for every family. Calculate your savings, check your eligibility, and start your application today.</p>
             <div className="flex gap-4">
@@ -711,7 +738,7 @@ function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-white/40 text-sm">© 2025 ChildcareHub. Information provided for guidance only.</p>
+          <p className="text-white/40 text-sm">© 2026 Splitfin Ltd. Information provided for guidance only.</p>
           <div className="flex gap-6 text-sm text-white/40">
             <button onClick={() => onNavigate('privacy')} className="hover:text-white transition-colors">Privacy Policy</button>
             <button onClick={() => onNavigate('terms')} className="hover:text-white transition-colors">Terms of Service</button>
@@ -754,7 +781,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">1. Who We Are</h2>
-          <p>ChildcareHub ("we", "us", "our") provides information and tools to help UK families understand and access government childcare funding. This Privacy Policy explains how we collect, use, and protect your personal data when you visit <strong>childcarehub.co.uk</strong>.</p>
+          <p>Splitfin Ltd T/A UK Childcare Help ("we", "us", "our") provides information and tools to help UK families understand and access government childcare funding. This Privacy Policy explains how we collect, use, and protect your personal data when you visit <strong>ukchildcarehelp.co.uk</strong>.</p>
         </section>
 
         <section>
@@ -814,7 +841,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
             <li>Data portability.</li>
             <li>Withdraw consent at any time.</li>
           </ul>
-          <p className="mt-2">To exercise any of these rights, contact us at <a href="mailto:privacy@childcarehub.co.uk" className="text-purple underline underline-offset-2">privacy@childcarehub.co.uk</a>.</p>
+          <p className="mt-2">To exercise any of these rights, contact us at <a href="mailto:alastair@splitfin.uk" className="text-purple underline underline-offset-2">alastair@splitfin.uk</a>.</p>
         </section>
 
         <section>
@@ -840,12 +867,12 @@ function TermsPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">1. Acceptance of Terms</h2>
-          <p>By accessing and using ChildcareHub ("the Site"), you accept and agree to be bound by these Terms of Service. If you do not agree, please do not use the Site.</p>
+          <p>By accessing and using UK Childcare Help ("the Site"), you accept and agree to be bound by these Terms of Service. If you do not agree, please do not use the Site.</p>
         </section>
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">2. Information Only — Not Professional Advice</h2>
-          <p>The information, tools, and calculators provided on ChildcareHub are for <strong>general guidance and informational purposes only</strong>. They do not constitute financial, legal, or professional advice. Government childcare funding rules change frequently; always verify current details with official sources such as <a href="https://www.gov.uk" target="_blank" rel="noopener noreferrer" className="text-purple underline underline-offset-2">GOV.UK</a> or <a href="https://www.childcarechoices.gov.uk" target="_blank" rel="noopener noreferrer" className="text-purple underline underline-offset-2">Childcare Choices</a>.</p>
+          <p>The information, tools, and calculators provided on UK Childcare Help are for <strong>general guidance and informational purposes only</strong>. They do not constitute financial, legal, or professional advice. Government childcare funding rules change frequently; always verify current details with official sources such as <a href="https://www.gov.uk" target="_blank" rel="noopener noreferrer" className="text-purple underline underline-offset-2">GOV.UK</a> or <a href="https://www.childcarechoices.gov.uk" target="_blank" rel="noopener noreferrer" className="text-purple underline underline-offset-2">Childcare Choices</a>.</p>
         </section>
 
         <section>
@@ -860,7 +887,7 @@ function TermsPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">5. Intellectual Property</h2>
-          <p>All content on the Site, including text, graphics, logos, and code, is the property of ChildcareHub or its licensors and is protected by UK copyright law. You may not reproduce, distribute, or create derivative works without our prior written consent.</p>
+          <p>All content on the Site, including text, graphics, logos, and code, is the property of UK Childcare Help or its licensors and is protected by UK copyright law. You may not reproduce, distribute, or create derivative works without our prior written consent.</p>
         </section>
 
         <section>
@@ -870,7 +897,7 @@ function TermsPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">7. Limitation of Liability</h2>
-          <p>To the fullest extent permitted by law, ChildcareHub shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of (or inability to use) the Site or any information contained therein.</p>
+          <p>To the fullest extent permitted by law, UK Childcare Help shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of (or inability to use) the Site or any information contained therein.</p>
         </section>
 
         <section>
@@ -885,7 +912,7 @@ function TermsPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">10. Contact</h2>
-          <p>Questions about these Terms? Contact us at <a href="mailto:hello@childcarehub.co.uk" className="text-purple underline underline-offset-2">hello@childcarehub.co.uk</a>.</p>
+          <p>Questions about these Terms? Contact us at <a href="mailto:alastair@splitfin.uk" className="text-purple underline underline-offset-2">alastair@splitfin.uk</a>.</p>
         </section>
       </div>
     </LegalPage>
@@ -976,7 +1003,7 @@ function CookiePolicyPage({ onBack }: { onBack: () => void }) {
 
         <section>
           <h2 className="font-heading font-bold text-xl text-dark mb-3">6. Contact</h2>
-          <p>Questions about our use of cookies? Email us at <a href="mailto:privacy@childcarehub.co.uk" className="text-purple underline underline-offset-2">privacy@childcarehub.co.uk</a>.</p>
+          <p>Questions about our use of cookies? Email us at <a href="mailto:alastair@splitfin.uk" className="text-purple underline underline-offset-2">alastair@splitfin.uk</a>.</p>
         </section>
       </div>
     </LegalPage>

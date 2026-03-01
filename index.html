@@ -4,6 +4,56 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UK Childcare Support Hub</title>
+    <!-- Google tag (gtag.js) - loaded but analytics blocked by default until consent -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3677F7KRT3"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+
+      // Default: deny analytics & ad storage until user consents
+      gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        wait_for_update: 500
+      });
+
+      gtag('js', new Date());
+      gtag('config', 'G-3677F7KRT3', { send_page_view: false });
+
+      // Re-check consent from localStorage on load
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('cookie_consent') || 'null');
+          if (saved && saved.analytics) {
+            gtag('consent', 'update', {
+              analytics_storage: 'granted'
+            });
+            gtag('event', 'page_view');
+          }
+          if (saved && saved.marketing) {
+            gtag('consent', 'update', {
+              ad_storage: 'granted'
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Google AdSense - only loads after ad_storage consent granted -->
+    <script>
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('cookie_consent') || 'null');
+          if (saved && saved.marketing) {
+            var s = document.createElement('script');
+            s.async = true;
+            s.crossOrigin = 'anonymous';
+            s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1986133345420332';
+            document.head.appendChild(s);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
