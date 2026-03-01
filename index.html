@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UK Childcare Support Hub</title>
+    <meta name="google-adsense-account" content="ca-pub-1986133345420332">
     <!-- Google tag (gtag.js) - loaded but analytics blocked by default until consent -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3677F7KRT3"></script>
     <script>
@@ -39,21 +40,8 @@
       })();
     </script>
 
-    <!-- Google AdSense - only loads after ad_storage consent granted -->
-    <script>
-      (function () {
-        try {
-          var saved = JSON.parse(localStorage.getItem('cookie_consent') || 'null');
-          if (saved && saved.marketing) {
-            var s = document.createElement('script');
-            s.async = true;
-            s.crossOrigin = 'anonymous';
-            s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1986133345420332';
-            document.head.appendChild(s);
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Google AdSense - always present for crawler verification; personalisation gated on consent via Consent Mode -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1986133345420332" crossorigin="anonymous"></script>
   </head>
   <body>
     <div id="root"></div>

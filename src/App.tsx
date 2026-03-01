@@ -67,14 +67,6 @@ function CookieConsent() {
         window.gtag('event', 'page_view');
       }
 
-      // Dynamically inject AdSense if marketing just got accepted
-      if (consent.marketing && !document.querySelector('script[src*="adsbygoogle"]')) {
-        const s = document.createElement('script');
-        s.async = true;
-        s.crossOrigin = 'anonymous';
-        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1986133345420332';
-        document.head.appendChild(s);
-      }
     }
 
     setVisible(false);
