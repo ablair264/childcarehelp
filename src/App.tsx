@@ -1,4 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import type { Page } from './types';
+import BlogIndexPage from './pages/BlogIndex';
+import BlogCombiningSchemesPage from './pages/BlogCombiningSchemes';
+import Blog30HoursGuidePage from './pages/Blog30HoursGuide';
+import BlogTFCvsUCPage from './pages/BlogTFCvsUC';
 import {
   CheckCircle,
   Clock,
@@ -28,6 +33,10 @@ import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+
+// ─── Module-level navigate helper ───────────────────────────────────────────
+let _navigate: (p: Page) => void = () => {};
+function navigate(p: Page) { _navigate(p); }
 
 // Extend window for gtag
 declare global {
