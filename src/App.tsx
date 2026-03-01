@@ -405,34 +405,154 @@ function FundingSchemes() {
   );
 }
 
-// ─── Eligibility Calculator ───────────────────────────────────────────────────
+// ─── Corrected Eligibility Calculator ───────────────────────────────────────────────────
 function EligibilityCalculator() {
+  // ─── State ─────────────────────────────────────────────────────────────────
   const [children, setChildren] = useState(1);
   const [hoursPerWeek, setHoursPerWeek] = useState(30);
+  const [childAge, setChildAge] = useState<'9m-2' | '2-3' | '3-4'>('3-4');
+  
+  // Work status
   const [isWorking, setIsWorking] = useState(true);
-  const [childAge, setChildAge] = useState('3-4');
+  const [workHoursPerWeek, setWorkHoursPerWeek] = useState(16);
+  const [partnerWorks, setPartnerWorks] = useState(true);
+  const [partnerWorkHours, setPartnerWorkHours] = useState(16);
+  
+  // Income
+  const [parent1Income, setParent1Income] = useState<number | ''>('');
+  const [parent2Income, setParent2Income] = useState<number | ''>('');
+  const [isSingleParent, setIsSingleParent] = useState(false);
+  
+  // Benefits & other schemes
+  const [receivesUniversalCredit, setReceivesUniversalCredit] = useState(false);
+  const [receivesTaxCredits, setReceivesTaxCredits] = useState(false);
+  const [onBenefits, setOnBenefits] = useState(false); // For 2-year-old eligibility
+  
+  // Costs
   const [hourlyRate, setHourlyRate] = useState<string>('6.50');
   const [useCustomRate, setUseCustomRate] = useState(false);
-
+  const [additionalWeeklySpend, setAdditionalWeeklySpend] = useState<string>(''); // For TFC calculation
+  
+  // ─── Constants ─────────────────────────────────────────────────────────────
+  const MIN_WORK_HOURS = 16;
+  const MIN_WEEKLY_EARNINGS = 195.36; // National Minimum Wage for 21+ at 16hrs/week (2025/26 rate)
+  const MAX_INCOME_30HRS = 100000;
+  const TFC_TOP_UP_RATE = 0.20; // 20% top-up
+  const TFC_MAX_ANNUAL_PER_CHILD = 2000;
+  const TFC_MAX_QUARTERLY_PER_CHILD = 500;
+  const UC_MAX_MONTHLY_1_CHILD = 1031.88;
+  const UC_MAX_MONTHLY_2PLUS_CHILDREN = 1768.94;
+  const ANNUAL_WEEKS = 38; // Term-time only
+  
+  // ─── Helper Functions ──────────────────────────────────────────────────────
   const parsedRate = parseFloat(hourlyRate) || 6.50;
-
-  const calculateSavings = () => {
-    const freeHours = isWorking && hoursPerWeek > 15 ? 30 : 15;
-    const actualFreeHours = Math.min(freeHours, hoursPerWeek);
-    const weeklySavings = actualFreeHours * parsedRate;
-    const annualSavings = weeklySavings * 38;
-    const taxFreeSavings = children * 2000;
-    return Math.round(annualSavings + taxFreeSavings);
+  const parsedAdditionalSpend = parseFloat(additionalWeeklySpend) || 0;
+  
+  const income1 = typeof parent1Income === 'number' ? parent1Income : 0;
+  const income2 = typeof parent2Income === 'number' ? parent2Income : 0;
+  
+  // Check 30-hour working eligibility
+  const meetsWorkRequirements = () => {
+    if (!isWorking) return false;
+    if (workHoursPerWeek < MIN_WORK_HOURS) return false;
+    
+    if (isSingleParent) {
+      return true; // Single parent just needs to work 16+ hrs
+    }
+    
+    // Both parents must work 16+ hours
+    if (!partnerWorks || partnerWorkHours < MIN_WORK_HOURS) return false;
+    return true;
   };
-
-  const savings = calculateSavings();
-  const freeHoursAmount = Math.round(savings * 0.7);
-  const tfcAmount = Math.round(savings * 0.3);
-
+  
+  // Check income limits for 30 hours
+  const meetsIncomeRequirements = () => {
+    if (income1 > MAX_INCOME_30HRS) return false;
+    if (!isSingleParent && income2 > MAX_INCOME_30HRS) return false;
+    return true;
+  };
+  
+  // Determine eligible free hours based on age and circumstances
+  const getEligibleFreeHours = () => {
+    // 3-4 year olds: Universal 15 hours for everyone
+    if (childAge === '3-4') {
+      if (meetsWorkRequirements() && meetsIncomeRequirements()) {
+        return 30;
+      }
+      return 15; // Universal entitlement
+    }
+    
+    // 2-3 year olds: 15 hours if on benefits, 30 if working
+    if (childAge === '2-3') {
+      if (meetsWorkRequirements() && meetsIncomeRequirements()) {
+        return 30;
+      }
+      if (onBenefits) {
+        return 15; // Disadvantaged 2-year-old funding
+      }
+      return 0;
+    }
+    
+    // 9m-2 year olds: 30 hours only if working (from Sept 2025 rollout)
+    if (childAge === '9m-2') {
+      if (meetsWorkRequirements() && meetsIncomeRequirements()) {
+        return 30;
+      }
+      return 0;
+    }
+    
+    return 0;
+  };
+  
+  // ─── Calculations ──────────────────────────────────────────────────────────
+  const eligibleFreeHours = getEligibleFreeHours();
+  const actualFreeHours = Math.min(eligibleFreeHours, hoursPerWeek);
+  const freeHoursWeeklyCost = actualFreeHours * parsedRate;
+  const freeHoursAnnualSavings = freeHoursWeeklyCost * ANNUAL_WEEKS;
+  
+  // Calculate remaining costs after free hours
+  const remainingWeeklyHours = Math.max(0, hoursPerWeek - actualFreeHours);
+  const remainingWeeklyCost = remainingWeeklyHours * parsedRate;
+  const remainingAnnualCost = remainingWeeklyCost * ANNUAL_WEEKS;
+  
+  // Tax-Free Childcare calculation
+  const calculateTFC = () => {
+    // Cannot use TFC if receiving Universal Credit or Tax Credits
+    if (receivesUniversalCredit || receivesTaxCredits) return 0;
+    if (parsedAdditionalSpend <= 0) return 0;
+    
+    // TFC is 20% of what you pay, up to £2,000/year per child
+    const annualSpend = parsedAdditionalSpend * 52; // User inputs weekly spend beyond free hours
+    const potentialTopUp = annualSpend * TFC_TOP_UP_RATE;
+    const maxTopUp = children * TFC_MAX_ANNUAL_PER_CHILD;
+    
+    return Math.min(potentialTopUp, maxTopUp);
+  };
+  
+  const tfcSavings = calculateTFC();
+  
+  // Universal Credit childcare calculation (alternative to TFC)
+  const calculateUC = () => {
+    if (!receivesUniversalCredit) return 0;
+    
+    // UC covers up to 85% of remaining costs
+    const monthlyRemainingCost = (remainingWeeklyCost * 52) / 12;
+    const maxMonthly = children === 1 ? UC_MAX_MONTHLY_1_CHILD : UC_MAX_MONTHLY_2PLUS_CHILDREN;
+    const claimableAmount = Math.min(monthlyRemainingCost * 0.85, maxMonthly);
+    
+    return claimableAmount * 12; // Annual
+  };
+  
+  const ucSavings = calculateUC();
+  
+  // Total savings (Free Hours + either TFC or UC, not both)
+  const totalSavings = Math.round(freeHoursAnnualSavings + (receivesUniversalCredit ? ucSavings : tfcSavings));
+  
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <section id="calculator" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
           {/* Calculator Form */}
           <div>
             <Badge className="bg-green/20 text-green border-0 mb-4">
@@ -441,134 +561,486 @@ function EligibilityCalculator() {
             <h2 className="font-heading font-bold text-4xl lg:text-5xl text-dark mb-4">
               Calculate Your <span className="text-purple">Savings</span>
             </h2>
-            <p className="text-lg text-light mb-8">Answer a few quick questions to see how much you could save on childcare costs.</p>
+            <p className="text-lg text-light mb-8">
+              Get an accurate estimate based on current UK government rules (2025/26).
+            </p>
 
             <Card className="border-0 shadow-card">
               <CardContent className="p-6 space-y-8">
-                {/* Number of Children */}
-                <div>
-                  <label className="flex items-center justify-between mb-4">
-                    <span className="font-medium text-dark">Number of Children</span>
-                    <span className="font-heading font-bold text-2xl text-purple">{children}</span>
-                  </label>
-                  <Slider value={[children]} onValueChange={(v) => setChildren(v[0])} max={5} min={1} step={1} className="w-full" />
-                  <div className="flex justify-between text-sm text-light mt-2"><span>1</span><span>5</span></div>
-                </div>
-
-                {/* Hours per Week */}
-                <div>
-                  <label className="flex items-center justify-between mb-4">
-                    <span className="font-medium text-dark">Hours per Week Needed</span>
-                    <span className="font-heading font-bold text-2xl text-purple">{hoursPerWeek}h</span>
-                  </label>
-                  <Slider value={[hoursPerWeek]} onValueChange={(v) => setHoursPerWeek(v[0])} max={50} min={5} step={5} className="w-full" />
-                  <div className="flex justify-between text-sm text-light mt-2"><span>5h</span><span>50h</span></div>
-                </div>
-
-                {/* Nursery Hourly Cost */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="font-medium text-dark">Nursery Hourly Cost</label>
-                    <button
-                      onClick={() => setUseCustomRate(!useCustomRate)}
-                      className={`text-xs px-3 py-1 rounded-full border transition-all ${useCustomRate ? 'border-purple bg-purple-light text-purple' : 'border-gray-200 text-light hover:border-purple/50'}`}
-                    >
-                      {useCustomRate ? '✓ Custom rate' : 'Use my nursery\'s rate'}
-                    </button>
+                
+                {/* ─── Child Details ───────────────────────────────────────── */}
+                <div className="space-y-4">
+                  <h3 className="font-heading font-bold text-lg text-dark flex items-center gap-2">
+                    <Baby className="w-5 h-5 text-purple" /> Child Details
+                  </h3>
+                  
+                  <div>
+                    <label className="block font-medium text-dark mb-3">Number of Children</label>
+                    <div className="flex items-center gap-4">
+                      <Slider 
+                        value={[children]} 
+                        onValueChange={(v) => setChildren(v[0])} 
+                        max={5} 
+                        min={1} 
+                        step={1} 
+                        className="flex-1" 
+                      />
+                      <span className="font-heading font-bold text-2xl text-purple w-8">{children}</span>
+                    </div>
                   </div>
 
-                  {useCustomRate ? (
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-dark font-medium">£</span>
-                      <input
-                        type="number"
-                        value={hourlyRate}
-                        onChange={(e) => setHourlyRate(e.target.value)}
-                        min={3}
-                        max={25}
-                        step={0.25}
-                        placeholder="e.g. 7.50"
-                        className="w-full pl-9 pr-16 py-3 rounded-xl border-2 border-purple/30 focus:border-purple outline-none font-medium text-dark transition-colors"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-light text-sm">/hr</span>
+                  <div>
+                    <label className="block font-medium text-dark mb-3">Child's Age</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: '9m-2', label: '9-23 months', note: '30hrs if working' },
+                        { key: '2-3', label: '2-3 years', note: '15hrs on benefits' },
+                        { key: '3-4', label: '3-4 years', note: '15hrs universal' }
+                      ].map((age) => (
+                        <button 
+                          key={age.key} 
+                          onClick={() => setChildAge(age.key as typeof childAge)} 
+                          className={`py-3 px-2 rounded-xl border-2 transition-all text-sm flex flex-col items-center gap-1 ${
+                            childAge === age.key 
+                              ? 'border-purple bg-purple-light text-purple' 
+                              : 'border-gray-200 text-light hover:border-purple/50'
+                          }`}
+                        >
+                          <span className="font-medium">{age.label}</span>
+                          <span className="text-xs opacity-80">{age.note}</span>
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3 bg-purple-light rounded-xl p-4">
-                      <PiggyBank className="w-5 h-5 text-purple flex-shrink-0" />
-                      <p className="text-sm text-purple">
-                        Using UK average of <span className="font-bold">£6.50/hr</span>. Toggle above to enter your nursery's actual rate for a more accurate estimate.
+                  </div>
+
+                  {childAge === '2-3' && (
+                    <div className="bg-yellow/10 rounded-xl p-4 border border-yellow/20">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={onBenefits} 
+                          onChange={(e) => setOnBenefits(e.target.checked)}
+                          className="w-5 h-5 rounded border-purple text-purple focus:ring-purple"
+                        />
+                        <span className="text-dark">Receiving qualifying benefits (for 15 hours)</span>
+                      </label>
+                      <p className="text-xs text-light mt-2 ml-8">
+                        Includes Income Support, JSA, ESA, Universal Credit, Tax Credits, etc.
                       </p>
                     </div>
                   )}
+                </div>
 
-                  {useCustomRate && parsedRate > 0 && (
-                    <p className="text-xs text-light mt-2">
-                      UK average is £6.50/hr. You've entered £{parsedRate.toFixed(2)}/hr.
-                    </p>
+                {/* ─── Work & Income ───────────────────────────────────────── */}
+                <div className="space-y-4">
+                  <h3 className="font-heading font-bold text-lg text-dark flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-purple" /> Work & Income
+                  </h3>
+
+                  <div>
+                    <label className="block font-medium text-dark mb-3">Are you working?</label>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => setIsWorking(true)} 
+                        className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
+                          isWorking 
+                            ? 'border-purple bg-purple-light text-purple' 
+                            : 'border-gray-200 text-light hover:border-purple/50'
+                        }`}
+                      >
+                        Yes, 16+ hrs/week
+                      </button>
+                      <button 
+                        onClick={() => setIsWorking(false)} 
+                        className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
+                          !isWorking 
+                            ? 'border-purple bg-purple-light text-purple' 
+                            : 'border-gray-200 text-light hover:border-purple/50'
+                        }`}
+                      >
+                        No / Less than 16hrs
+                      </button>
+                    </div>
+                  </div>
+
+                  {isWorking && (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          id="singleParent" 
+                          checked={isSingleParent} 
+                          onChange={(e) => setIsSingleParent(e.target.checked)}
+                          className="w-5 h-5 rounded border-purple text-purple"
+                        />
+                        <label htmlFor="singleParent" className="text-dark">Single parent household</label>
+                      </div>
+
+                      {!isSingleParent && (
+                        <div>
+                          <label className="block font-medium text-dark mb-3">Partner working 16+ hrs/week?</label>
+                          <div className="flex gap-4">
+                            <button 
+                              onClick={() => setPartnerWorks(true)} 
+                              className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
+                                partnerWorks 
+                                  ? 'border-purple bg-purple-light text-purple' 
+                                  : 'border-gray-200 text-light hover:border-purple/50'
+                              }`}
+                            >
+                              Yes
+                            </button>
+                            <button 
+                              onClick={() => setPartnerWorks(false)} 
+                              className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
+                                !partnerWorks 
+                                  ? 'border-purple bg-purple-light text-purple' 
+                                  : 'border-gray-200 text-light hover:border-purple/50'
+                              }`}
+                            >
+                              No
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-dark mb-2">Your annual income</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark">£</span>
+                            <input 
+                              type="number" 
+                              value={parent1Income} 
+                              onChange={(e) => setParent1Income(e.target.value ? Number(e.target.value) : '')}
+                              placeholder="e.g. 35000"
+                              className="w-full pl-8 pr-4 py-2 rounded-xl border-2 border-purple/30 focus:border-purple outline-none"
+                            />
+                          </div>
+                        </div>
+                        {!isSingleParent && (
+                          <div>
+                            <label className="block text-sm font-medium text-dark mb-2">Partner's annual income</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark">£</span>
+                              <input 
+                                type="number" 
+                                value={parent2Income} 
+                                onChange={(e) => setParent2Income(e.target.value ? Number(e.target.value) : '')}
+                                placeholder="e.g. 35000"
+                                className="w-full pl-8 pr-4 py-2 rounded-xl border-2 border-purple/30 focus:border-purple outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-light">
+                        Must be under £100,000 each for 30-hour eligibility. Earning at least £195/week (NMW for 16hrs).
+                      </p>
+                    </>
                   )}
                 </div>
 
-                {/* Working Status */}
-                <div>
-                  <label className="block font-medium text-dark mb-4">Are both parents working? (or single parent)</label>
-                  <div className="flex gap-4">
-                    {[true, false].map((val) => (
-                      <button key={String(val)} onClick={() => setIsWorking(val)} className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${isWorking === val ? 'border-purple bg-purple-light text-purple' : 'border-gray-200 text-light hover:border-purple/50'}`}>
-                        <div className="flex items-center justify-center gap-2">
-                          {val ? <CheckCircle className="w-5 h-5" /> : <X className="w-5 h-5" />}
-                          {val ? 'Yes' : 'No'}
-                        </div>
-                      </button>
-                    ))}
+                {/* ─── Other Schemes ───────────────────────────────────────── */}
+                <div className="space-y-4">
+                  <h3 className="font-heading font-bold text-lg text-dark flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-purple" /> Other Support
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={receivesUniversalCredit} 
+                        onChange={(e) => {
+                          setReceivesUniversalCredit(e.target.checked);
+                          if (e.target.checked) setReceivesTaxCredits(false);
+                        }}
+                        className="w-5 h-5 rounded border-purple text-purple"
+                      />
+                      <span className="text-dark">Receiving Universal Credit</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={receivesTaxCredits} 
+                        onChange={(e) => {
+                          setReceivesTaxCredits(e.target.checked);
+                          if (e.target.checked) setReceivesUniversalCredit(false);
+                        }}
+                        className="w-5 h-5 rounded border-purple text-purple"
+                      />
+                      <span className="text-dark">Receiving Tax Credits</span>
+                    </label>
                   </div>
+
+                  {(receivesUniversalCredit || receivesTaxCredits) && (
+                    <div className="bg-pink/10 rounded-xl p-4 border border-pink/20">
+                      <p className="text-sm text-dark">
+                        <strong>Note:</strong> You cannot use Tax-Free Childcare with {receivesUniversalCredit ? 'Universal Credit' : 'Tax Credits'}. 
+                        We'll calculate which gives you better support.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Child Age */}
-                <div>
-                  <label className="block font-medium text-dark mb-4">Child's Age</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {['9m-2', '2-3', '3-4'].map((age) => (
-                      <button key={age} onClick={() => setChildAge(age)} className={`py-3 px-2 rounded-xl border-2 transition-all text-sm ${childAge === age ? 'border-purple bg-purple-light text-purple' : 'border-gray-200 text-light hover:border-purple/50'}`}>
-                        {age === '9m-2' ? '9-23 months' : age === '2-3' ? '2-3 years' : '3-4 years'}
-                      </button>
-                    ))}
+                {/* ─── Childcare Costs ─────────────────────────────────────── */}
+                <div className="space-y-4">
+                  <h3 className="font-heading font-bold text-lg text-dark flex items-center gap-2">
+                    <PiggyBank className="w-5 h-5 text-purple" /> Childcare Costs
+                  </h3>
+
+                  <div>
+                    <label className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-dark">Hours per week needed</span>
+                      <span className="font-heading font-bold text-2xl text-purple">{hoursPerWeek}h</span>
+                    </label>
+                    <Slider 
+                      value={[hoursPerWeek]} 
+                      onValueChange={(v) => setHoursPerWeek(v[0])} 
+                      max={50} 
+                      min={5} 
+                      step={5} 
+                      className="w-full" 
+                    />
                   </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="font-medium text-dark">Nursery hourly rate</label>
+                      <button
+                        onClick={() => setUseCustomRate(!useCustomRate)}
+                        className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                          useCustomRate 
+                            ? 'border-purple bg-purple-light text-purple' 
+                            : 'border-gray-200 text-light hover:border-purple/50'
+                        }`}
+                      >
+                        {useCustomRate ? 'Using custom rate' : 'Use UK average (£6.50)'}
+                      </button>
+                    </div>
+
+                    {useCustomRate ? (
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-dark font-medium">£</span>
+                        <input
+                          type="number"
+                          value={hourlyRate}
+                          onChange={(e) => setHourlyRate(e.target.value)}
+                          min={3}
+                          max={25}
+                          step={0.25}
+                          className="w-full pl-9 pr-16 py-3 rounded-xl border-2 border-purple/30 focus:border-purple outline-none font-medium text-dark"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-light text-sm">/hr</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 bg-purple-light rounded-xl p-4">
+                        <PiggyBank className="w-5 h-5 text-purple flex-shrink-0" />
+                        <p className="text-sm text-purple">
+                          Using UK average of <span className="font-bold">£6.50/hr</span>. 
+                          Toggle above to enter your actual rate.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tax-Free Childcare spending input - only show if eligible */}
+                  {!receivesUniversalCredit && !receivesTaxCredits && eligibleFreeHours > 0 && (
+                    <div className="bg-green/10 rounded-xl p-4 border border-green/20 space-y-3">
+                      <label className="block font-medium text-dark">
+                        Weekly childcare costs AFTER free hours
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark">£</span>
+                        <input
+                          type="number"
+                          value={additionalWeeklySpend}
+                          onChange={(e) => setAdditionalWeeklySpend(e.target.value)}
+                          placeholder="e.g. 100"
+                          className="w-full pl-8 pr-4 py-2 rounded-xl border-2 border-green/30 focus:border-green outline-none"
+                        />
+                      </div>
+                      <p className="text-xs text-light">
+                        Tax-Free Childcare gives 20% back on these costs (max £2,000/year/child). 
+                        Based on {remainingWeeklyHours}hrs/week not covered by free hours.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Results */}
-          <div className="lg:pl-8">
-            <Card className="border-0 shadow-card gradient-purple text-white overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+          {/* ─── Results Panel ─────────────────────────────────────────────── */}
+          <div className="lg:pl-8 lg:sticky lg:top-32">
+            <Card className={`border-0 shadow-card overflow-hidden relative ${
+              totalSavings > 0 ? 'gradient-purple text-white' : 'bg-gray-100 text-dark'
+            }`}>
+              {totalSavings > 0 && (
+                <>
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+                </>
+              )}
+              
               <CardContent className="p-8 relative">
                 <div className="text-center mb-8">
-                  <p className="text-white/80 mb-2">Your Estimated Annual Savings</p>
-                  <div className="font-heading font-extrabold text-6xl lg:text-7xl">£{savings.toLocaleString()}</div>
-                  <p className="text-white/60 text-sm mt-2">
-                    *Based on {useCustomRate && parsedRate > 0 ? `£${parsedRate.toFixed(2)}/hr (your rate)` : '£6.50/hr UK average'}
+                  <p className={`mb-2 ${totalSavings > 0 ? 'text-white/80' : 'text-light'}`}>
+                    Your Estimated Annual Savings
                   </p>
-                </div>
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
-                    <div className="flex items-center gap-3"><Clock className="w-5 h-5 text-yellow" /><span>Free Hours Funding</span></div>
-                    <span className="font-bold">£{freeHoursAmount.toLocaleString()}</span>
+                  <div className={`font-heading font-extrabold text-6xl lg:text-7xl ${
+                    totalSavings > 0 ? '' : 'text-gray-400'
+                  }`}>
+                    £{totalSavings.toLocaleString()}
                   </div>
-                  <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
-                    <div className="flex items-center gap-3"><PiggyBank className="w-5 h-5 text-yellow" /><span>Tax-Free Childcare</span></div>
-                    <span className="font-bold">£{tfcAmount.toLocaleString()}</span>
-                  </div>
+                  
+                  {totalSavings === 0 && (
+                    <p className="text-light mt-4">
+                      Based on your circumstances, you may not be eligible for additional funding. 
+                      All 3-4 year olds get 15 universal hours.
+                    </p>
+                  )}
                 </div>
-                <Button className="w-full bg-white text-purple hover:bg-yellow hover:text-dark font-bold py-6 rounded-xl btn-squish" onClick={() => toast.success('Check your eligibility on the government website!')}>
+
+                {totalSavings > 0 && (
+                  <div className="space-y-4 mb-8">
+                    {/* Free Hours Breakdown */}
+                    {freeHoursAnnualSavings > 0 && (
+                      <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          <Clock className="w-5 h-5 text-yellow" />
+                          <div>
+                            <span className="font-medium">
+                              {eligibleFreeHours === 30 ? '30 Hours Free' : '15 Hours Free'}
+                            </span>
+                            <p className="text-xs text-white/70">
+                              {actualFreeHours}hrs/week × {ANNUAL_WEEKS} weeks
+                            </p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-lg">£{Math.round(freeHoursAnnualSavings).toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {/* Tax-Free Childcare */}
+                    {!receivesUniversalCredit && tfcSavings > 0 && (
+                      <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          <PiggyBank className="w-5 h-5 text-yellow" />
+                          <div>
+                            <span className="font-medium">Tax-Free Childcare</span>
+                            <p className="text-xs text-white/70">20% top-up on your spending</p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-lg">£{Math.round(tfcSavings).toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {/* Universal Credit */}
+                    {receivesUniversalCredit && ucSavings > 0 && (
+                      <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="w-5 h-5 text-yellow" />
+                          <div>
+                            <span className="font-medium">Universal Credit (85% back)</span>
+                            <p className="text-xs text-white/70">Up to £{children === 1 ? '1,032' : '1,769'}/month</p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-lg">£{Math.round(ucSavings).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Eligibility Status */}
+                <div className={`rounded-xl p-4 mb-6 ${
+                  totalSavings > 0 ? 'bg-white/10' : 'bg-white'
+                }`}>
+                  <h4 className={`font-bold mb-2 ${totalSavings > 0 ? 'text-white' : 'text-dark'}`}>
+                    Your Eligibility Status
+                  </h4>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      {eligibleFreeHours >= 15 ? (
+                        <CheckCircle className={`w-4 h-4 ${totalSavings > 0 ? 'text-green' : 'text-green'}`} />
+                      ) : (
+                        <X className="w-4 h-4 text-red-400" />
+                      )}
+                      <span className={totalSavings > 0 ? 'text-white/90' : 'text-light'}>
+                        {childAge === '3-4' 
+                          ? '15 hours universal (all families)' 
+                          : eligibleFreeHours >= 15 
+                            ? '15 hours eligible' 
+                            : '15 hours not eligible'}
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      {eligibleFreeHours === 30 ? (
+                        <CheckCircle className={`w-4 h-4 ${totalSavings > 0 ? 'text-green' : 'text-green'}`} />
+                      ) : (
+                        <X className={`w-4 h-4 ${totalSavings > 0 ? 'text-white/40' : 'text-gray-300'}`} />
+                      )}
+                      <span className={totalSavings > 0 ? 'text-white/90' : 'text-light'}>
+                        30 hours working parent scheme
+                        {!meetsWorkRequirements() && isWorking && ' (need 16+ hrs both parents)'}
+                        {!meetsIncomeRequirements() && ' (income over £100k)'}
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      {!receivesUniversalCredit && !receivesTaxCredits ? (
+                        <CheckCircle className={`w-4 h-4 ${totalSavings > 0 ? 'text-green' : 'text-green'}`} />
+                      ) : (
+                        <X className={`w-4 h-4 ${totalSavings > 0 ? 'text-white/40' : 'text-gray-300'}`} />
+                      )}
+                      <span className={totalSavings > 0 ? 'text-white/90' : 'text-light'}>
+                        Tax-Free Childcare available
+                        {(receivesUniversalCredit || receivesTaxCredits) && ' (not with UC/Tax Credits)'}
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+
+                <Button 
+                  className={`w-full font-bold py-6 rounded-xl btn-squish ${
+                    totalSavings > 0 
+                      ? 'bg-white text-purple hover:bg-yellow hover:text-dark' 
+                      : 'bg-purple text-white hover:bg-purple/90'
+                  }`} 
+                  onClick={() => window.open('https://www.childcarechoices.gov.uk/', '_blank')}
+                >
                   Check Official Eligibility <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
+                
+                <p className={`text-xs mt-4 text-center ${
+                  totalSavings > 0 ? 'text-white/60' : 'text-light'
+                }`}>
+                  *Estimate only. Actual amounts depend on your specific circumstances and provider rates.
+                </p>
               </CardContent>
             </Card>
+
+            {/* Quick Links */}
             <div className="mt-6 grid grid-cols-2 gap-4">
-              <div className="glass rounded-xl p-4 text-center"><CheckCircle className="w-6 h-6 text-green mx-auto mb-2" /><p className="font-medium text-dark text-sm">16+ hrs work/week</p></div>
-              <div className="glass rounded-xl p-4 text-center"><Shield className="w-6 h-6 text-purple mx-auto mb-2" /><p className="font-medium text-dark text-sm">Under £100k income</p></div>
+              <a 
+                href="https://www.childcarechoices.gov.uk/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="glass rounded-xl p-4 text-center hover:bg-purple-light transition-colors group"
+              >
+                <ExternalLink className="w-6 h-6 text-purple mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-medium text-dark text-sm">Childcare Choices</p>
+              </a>
+              <a 
+                href="https://www.gov.uk/childcare-calculator" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="glass rounded-xl p-4 text-center hover:bg-purple-light transition-colors group"
+              >
+                <Calculator className="w-6 h-6 text-purple mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-medium text-dark text-sm">Gov Calculator</p>
+              </a>
             </div>
           </div>
         </div>
