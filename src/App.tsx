@@ -26,6 +26,11 @@ import {
   ExternalLink,
   Cookie,
   ChevronLeft,
+  Layers,
+  Scale,
+  BookOpen,
+  Mail,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,10 +38,6 @@ import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-
-// ─── Module-level navigate helper ───────────────────────────────────────────
-let _navigate: (p: Page) => void = () => {};
-function navigate(p: Page) { _navigate(p); }
 
 // Extend window for gtag
 declare global {
@@ -162,9 +163,8 @@ function CookieConsent() {
   );
 }
 
-// ─── Simple page router ───────────────────────────────────────────────────────
-type Page = 'home' | 'privacy' | 'terms' | 'cookies';
-let _navigate: (p: Page) => void = () => { };
+// ─── Module-level navigate helper ───────────────────────────────────────────
+let _navigate: (p: Page) => void = () => {};
 function navigate(p: Page) { _navigate(p); }
 
 // ─── Navigation Component ─────────────────────────────────────────────────────
@@ -423,9 +423,9 @@ function EligibilityCalculator() {
   
   // Work status
   const [isWorking, setIsWorking] = useState(true);
-  const [workHoursPerWeek, setWorkHoursPerWeek] = useState(16);
+  const [workHoursPerWeek] = useState(16);
   const [partnerWorks, setPartnerWorks] = useState(true);
-  const [partnerWorkHours, setPartnerWorkHours] = useState(16);
+  const [partnerWorkHours] = useState(16);
   
   // Income
   const [parent1Income, setParent1Income] = useState<number | ''>('');
@@ -444,11 +444,9 @@ function EligibilityCalculator() {
   
   // ─── Constants ─────────────────────────────────────────────────────────────
   const MIN_WORK_HOURS = 16;
-  const MIN_WEEKLY_EARNINGS = 195.36; // National Minimum Wage for 21+ at 16hrs/week (2025/26 rate)
   const MAX_INCOME_30HRS = 100000;
   const TFC_TOP_UP_RATE = 0.20; // 20% top-up
   const TFC_MAX_ANNUAL_PER_CHILD = 2000;
-  const TFC_MAX_QUARTERLY_PER_CHILD = 500;
   const UC_MAX_MONTHLY_1_CHILD = 1031.88;
   const UC_MAX_MONTHLY_2PLUS_CHILDREN = 1768.94;
   const ANNUAL_WEEKS = 38; // Term-time only
@@ -522,7 +520,6 @@ function EligibilityCalculator() {
   // Calculate remaining costs after free hours
   const remainingWeeklyHours = Math.max(0, hoursPerWeek - actualFreeHours);
   const remainingWeeklyCost = remainingWeeklyHours * parsedRate;
-  const remainingAnnualCost = remainingWeeklyCost * ANNUAL_WEEKS;
   
   // Tax-Free Childcare calculation
   const calculateTFC = () => {
@@ -1197,6 +1194,7 @@ function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
               {[{ name: 'Home', href: '#home' }, { name: 'Funding Guide', href: '#schemes' }, { name: 'Eligibility Checker', href: '#calculator' }, { name: 'How It Works', href: '#pathway' }, { name: 'FAQs', href: '#faq' }].map((link) => (
                 <li key={link.name}><a href={link.href} className="text-white/60 hover:text-purple transition-colors">{link.name}</a></li>
               ))}
+              <li><button onClick={() => onNavigate('blog')} className="text-white/60 hover:text-purple transition-colors">Blog</button></li>
             </ul>
           </div>
 
@@ -1512,6 +1510,10 @@ function App() {
         {page === 'privacy' && <PrivacyPage onBack={() => setPage('home')} />}
         {page === 'terms' && <TermsPage onBack={() => setPage('home')} />}
         {page === 'cookies' && <CookiePolicyPage onBack={() => setPage('home')} />}
+        {page === 'blog' && <BlogIndexPage onBack={() => setPage('home')} onNavigate={setPage} />}
+        {page === 'blog-combining-schemes' && <BlogCombiningSchemesPage onBack={() => setPage('blog')} onNavigate={setPage} />}
+        {page === 'blog-30-hours-guide' && <Blog30HoursGuidePage onBack={() => setPage('blog')} onNavigate={setPage} />}
+        {page === 'blog-tfc-vs-uc' && <BlogTFCvsUCPage onBack={() => setPage('blog')} onNavigate={setPage} />}
       </main>
       <Footer onNavigate={setPage} />
       <CookieConsent />
